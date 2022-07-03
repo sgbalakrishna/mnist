@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-
+from torch.autograd import Variable
 
 
 train = pd.read_csv("train.csv")
@@ -71,3 +71,86 @@ class CNNModel(nn.Module):
         
         # Fully connected 1
         self.fc1 = nn.Linear(32 * 5 * 5, 10) 
+
+    def forward(self, x):
+        # Set 1
+        out = self.cnn1(x)
+        out = self.relu1(out)
+        out = self.maxpool1(out)
+        
+        # Set 2
+        out = self.cnn2(out)
+        out = self.relu2(out)
+        out = self.maxpool2(out)
+        
+        #Flatten
+        out = out.view(out.size(0), -1)
+
+        #Dense
+        out = self.fc1(out)
+        
+        return out#
+
+
+#Definition of hyperparameters
+n_iters = 2500
+num_epochs = n_iters / (len(train_x) / batch_size)
+num_epochs = int(num_epochs)
+
+# Cross Entropy Loss 
+error = nn.CrossEntropyLoss()
+
+# SGD Optimizer
+learning_rate = 0.001
+
+model = CNNModel()
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+
+
+
+count = 0
+loss_list = []
+iteration_list = []
+accuracy_list = []
+for epoch in range(num_epochs):
+    for i, (images, labels) in enumerate(train_loader):
+        
+        train = Variable(images.view(100,1,28,28))
+        labels = Variable(labels)
+        # Clear gradients
+        optimizer.zero_grad()
+        # Forward propagation
+        outputs = model(train)
+        # Calculate softmax and ross entropy loss
+        loss = error(outputs, labels)
+        # Calculating gradients
+        loss.backward()
+        # Update parameters
+        optimizer.step()
+        
+        count += 1
+        if count % 50 == 0:
+            # Calculate Accuracy         
+            correct = 0
+            total = 0
+            # Iterate through test dataset
+            for images, labels in test_loader:
+                
+                test = Variable(images.view(100,1,28,28))
+                # Forward propagation
+                outputs = model(test)
+                # Get predictions from the maximum value
+                predicted = torch.max(outputs.data, 1)[1]
+                
+                # Total number of labels
+                total += len(labels)
+                correct += (predicted == labels).sum()
+            
+            accuracy = 100 * correct / float(total)
+            
+            # store loss and iteration
+            loss_list.append(loss.data)
+            iteration_list.append(count)
+            accuracy_list.append(accuracy)
+            if count % 500 == 0:
+                print('Iteration: {}  Loss: {}  Accuracy: {} %'.format(count, loss.data, accuracy))
